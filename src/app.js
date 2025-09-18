@@ -11,17 +11,12 @@ const PORT = process.env.PORT ?? 5000;
 
 // Basic middleware
 app.use(cors({
-  origin: "https://elesa-website-lac.vercel.app",
+  origin: "https://elesa-website-lac.vercel.app",  // your frontend domain
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
 
 
-app.options("*", cors({
-  origin: "https://elesa-website-lac.vercel.app",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-}));
 
 
 app.use(express.json());
