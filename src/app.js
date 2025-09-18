@@ -14,10 +14,16 @@ const PORT = process.env.PORT ?? 5000;
 //   origin: process.env.CLIENT_ORIGIN || "*" // for production set exact origin
 // }));
 
+// app.use(cors({
+//   origin: "https://elesa-website-lac.vercel.app/",  // only allow frontend
+//   methods: ["GET", "POST"],
+//   credentials: true
+// }));
+
 app.use(cors({
-  origin: "https://elesa-website-lac.vercel.app/",  // only allow frontend
+  origin: "https://elesa-website-qvwv24d8v-sanved-diwares-projects.vercel.app",
   methods: ["GET", "POST"],
-  credentials: true
+  allowedHeaders: ["Content-Type"],
 }));
 
 app.use(express.json());
