@@ -11,13 +11,14 @@ const PORT = process.env.PORT ?? 5000;
 
 // Basic middleware
 app.use(cors({
-  origin: "https://elesa-website-qvwv24d8v-sanved-diwares-projects.vercel.app",
-  methods: ["GET", "POST", "OPTIONS"],
+  origin: "https://elesa-website-lac.vercel.app",
+  methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
 
+
 app.options("*", cors({
-  origin: "https://elesa-website-qvwv24d8v-sanved-diwares-projects.vercel.app",
+  origin: "https://elesa-website-lac.vercel.app",
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
