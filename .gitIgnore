@@ -1,3 +1,5 @@
+/token.json
+credentials/service-account.json
 # Logs
 logs
 *.log

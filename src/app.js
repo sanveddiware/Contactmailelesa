@@ -1,137 +1,235 @@
-// app.js
 import express from "express";
+import multer from "multer";
 import cors from "cors";
-import nodemailer from "nodemailer";
-import dotenv from "dotenv";
-
-dotenv.config();
+import fs from "fs";
+import { google } from "googleapis";   // <-- missing import
+import { appendToSheet } from "./sheets.js";
+import { sendThankYouEmail } from "./mailer.js";
+import { uploadToDrive } from "./drive.js";
+import contactRouter from '../../backend/src/contact.js'
 
 const app = express();
-const PORT = process.env.PORT ?? 5000;
 
-// Basic middleware
+// ---------- Middleware ----------
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4000",
+  process.env.FRONTEND_URLS // optional: from .env for deployment
+];
+
 app.use(cors({
-  origin: "https://elesa-website-lac.vercel.app",  // your frontend domain
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
+  origin: function(origin, callback){
+    // allow requests with no origin (like mobile apps or Postman)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = `The CORS policy for this site does not allow access from the specified Origin.`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
 }));
 
 
-
-
-app.use(express.json());
-
-// Create transporter function so it can use either Gmail (prod) or Ethereal (dev)
-async function createTransporter() {
-  // If you want to use Ethereal for testing, set USE_ETHEREAL=true in .env
-  if (process.env.USE_ETHEREAL === "true") {
-    // Create test account (Ethereal)
-    const testAccount = await nodemailer.createTestAccount();
-    return nodemailer.createTransport({
-      host: testAccount.smtp.host,
-      port: testAccount.smtp.port,
-      secure: testAccount.smtp.secure,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass
-      }
-    });
-  }
-
-  // Production: Gmail (using App Password)
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error("EMAIL_USER and EMAIL_PASS must be set in .env for non-ethereal mode.");
-  }
-
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
+app.use("/api/send", contactRouter);
+// Ensure uploads folder exists
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
 }
 
-// Pre-create transporter at startup (and verify)
-let transporter;
-createTransporter()
-  .then(t => {
-    transporter = t;
-    // verify transporter config
-    transporter.verify()
-      .then(() => console.log("✅ Mail transporter ready"))
-      .catch(err => console.warn("⚠️ Mail transporter verification failed:", err.message));
-  })
-  .catch(err => {
-    console.error("Failed to create transporter:", err);
-    process.exit(1);
-  });
+// ---------- Multer Setup ----------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
 
-// Simple helper to validate email-like string (basic)
-function isValidEmail(email) {
-  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+});
 
-// POST /send - accepts { name, email, message }
-app.post("/api/send", async (req, res) => {
-  const { name, email, message } = req.body ?? {};
+// ---------- OAuth2 Setup ----------
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID_OAuth,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.REDIRECT_URI
+);
 
-  // Basic validation
-  if (!name || !email || !message) {
-    return res.status(400).json({ success: false, msg: "name, email and message are required." });
-  }
-  if (!isValidEmail(email)) {
-    return res.status(400).json({ success: false, msg: "Invalid email address." });
-  }
-
-  // Compose email
-  const mailOptions = {
-    from: `"${name}" <${email}>`,              // shown as sender
-    to: process.env.EMAIL_RECEIVER || process.env.EMAIL_USER, // receiver
-    subject: `New message from ${name}`,
-    text: `Name: ${name}\nEmail: ${email}\n\n${message}`,
-    html: `<p><strong>Name:</strong> ${escapeHtml(name)}</p>
-           <p><strong>Email:</strong> ${escapeHtml(email)}</p>
-           <p><strong>Message:</strong></p>
-           <p>${nl2br(escapeHtml(message))}</p>`
-  };
-
+// Route to start auth
+app.get("/auth", (req, res) => {
   try {
-    if (!transporter) {
-      return res.status(500).json({ success: false, msg: "Mail transporter not initialized." });
-    }
+    const url = oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: ["https://www.googleapis.com/auth/drive.file"],
+      prompt: "consent",
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-
-    // If Ethereal, return preview URL so dev can inspect message
-    if (process.env.USE_ETHEREAL === "true") {
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      return res.status(200).json({ success: true, msg: "Email sent (ethereal).", previewUrl });
-    }
-
-    return res.status(200).json({ success: true, msg: "Email sent successfully." });
-  } catch (error) {
-    console.error("Error sending email:", error);
-    return res.status(500).json({ success: false, msg: "Failed to send email." });
+    console.log("🔗 Generated Auth URL:", url);
+    res.redirect(url);
+  } catch (err) {
+    console.error("❌ Error generating auth URL:", err);
+    res.status(500).send("Error generating auth URL");
   }
 });
 
-// Small helper functions
-function escapeHtml(str = "") {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-function nl2br(str = "") {
-  return str.replace(/\r?\n/g, "<br>");
-}
+// Callback route
+app.get("/oauth2callback", async (req, res) => {
+  console.log("📌 /oauth2callback hit");
+  console.log("Query params:", req.query);
 
-// Healthcheck
-app.get("/", (_, res) => res.send("Mail backend running"));
+  const code = req.query.code;
+  if (!code) {
+    console.log("❌ No code received in query params");
+    return res.send("No code received");
+  }
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  try {
+    console.log("✅ Code received:", code);
+
+    // Exchange code for tokens
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log("🔑 Tokens received:", tokens);
+
+    // Set credentials in oauth2Client
+    oauth2Client.setCredentials(tokens);
+
+    // Save tokens to token.json
+    fs.writeFileSync("token.json", JSON.stringify(tokens, null, 2));
+    console.log("💾 token.json successfully created!");
+
+    res.send("Authentication successful! You can close this window.");
+  } catch (err) {
+    console.error("❌ Error retrieving access token:", err);
+    res.status(500).send("Error retrieving access token");
+  }
+});
+
+// ---------- Register Route ----------
+// app.post(
+//   "/api/register",
+//   upload.fields([
+//     { name: "collegeId", maxCount: 1 },
+//     { name: "paymentscreenshot", maxCount: 1 },
+//   ]),
+//   async (req, res) => {
+//     try {
+//       const collegeIdLink = req.files?.collegeId
+//         ? await uploadToDrive(req.files.collegeId[0])
+//         : "";
+
+//       const paymentScreenshotLink = req.files?.paymentscreenshot
+//         ? await uploadToDrive(req.files.paymentscreenshot[0])
+//         : "";
+
+//       const row = [
+//         req.body.name,
+//         req.body.email,
+//         req.body.phone,
+//         req.body.college,
+//         req.body.event,
+//         req.body.transactionId,
+//         req.body.payment,
+//         collegeIdLink,
+//         paymentScreenshotLink,
+//         new Date().toLocaleString(),
+//       ];
+
+//       await appendToSheet(row);
+//       await sendThankYouEmail(req.body.email, req.body.name, req.body.event);
+
+//       res.json({
+//         success: true,
+//         msg: "✅ Registration successful! Data saved & files uploaded to Drive.",
+//         data: {
+//           ...req.body,
+//           collegeId: collegeIdLink,
+//           paymentscreenshot: paymentScreenshotLink,
+//         },
+//       });
+//     } catch (err) {
+//       console.error("Error in /api/register:", err);
+//       res.status(500).json({ success: false, msg: "❌ Server error", error: err.message });
+//     }
+//   }
+// );
+app.post(
+  "/api/register",
+  upload.fields([
+    { name: "collegeId", maxCount: 1 },
+    { name: "paymentscreenshot", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    let collegeIdLink = "";
+    let paymentScreenshotLink = "";
+    const uploadedFiles = [];
+
+    try {
+      // Upload College ID
+      if (req.files?.collegeId) {
+        uploadedFiles.push(req.files.collegeId[0].path);
+        collegeIdLink = await uploadToDrive(req.files.collegeId[0]);
+      }
+
+      // Upload Payment Screenshot
+      if (req.files?.paymentscreenshot) {
+        uploadedFiles.push(req.files.paymentscreenshot[0].path);
+        paymentScreenshotLink = await uploadToDrive(req.files.paymentscreenshot[0]);
+      }
+
+      const row = [
+        req.body.name,
+        req.body.email,
+        req.body.phone,
+        req.body.college,
+        req.body.event,
+        req.body.transactionId,
+        req.body.payment,
+        collegeIdLink,
+        paymentScreenshotLink,
+        new Date().toLocaleString(),
+      ];
+
+      await appendToSheet(row);
+      await sendThankYouEmail(req.body.email, req.body.name, req.body.event);
+
+      res.json({
+        success: true,
+        msg: "✅ Registration successful! Data saved & files uploaded to Drive.",
+        data: {
+          ...req.body,
+          collegeId: collegeIdLink,
+          paymentscreenshot: paymentScreenshotLink,
+        },
+      });
+    } catch (err) {
+      console.error("Error in /api/register:", err);
+      res.status(500).json({ success: false, msg: "❌ Server error", error: err.message });
+    } finally {
+      // Always delete uploaded files, success or error
+      for (const path of uploadedFiles) {
+        fs.unlink(path, (err) => {
+          if (err) console.error("Failed to delete uploaded file:", path, err);
+        });
+      }
+    }
+  }
+);
+
+
+
+//Testing
+// app.get("/ping", (req, res) => {
+//   console.log("Ping route hit");
+//   res.send("pong");
+// });
+
+
+//Electrovert Website
+
+
+app.listen(5000, () => {
+  console.log("🚀 Server running at http://localhost:5000");
 });
