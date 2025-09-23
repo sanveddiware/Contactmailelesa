@@ -1,14 +1,6 @@
 import nodemailer from "nodemailer";
 
 export default async function handler(req, res) {
-  // CORS headers for Vercel if needed
-  if (process.env.VERCEL) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") return res.status(200).end();
-  }
-
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -30,25 +22,26 @@ export default async function handler(req, res) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS, // Gmail App Password
+        user: process.env.EMAIL_USER, // your Gmail
+        pass: process.env.EMAIL_PASS, // Gmail App Password
       },
     });
 
-    // Email to Admin
+    // Send email to admin (fixed recipient)
     await transporter.sendMail({
-      from: `"ELESA Contact Form" <${process.env.MAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL,
-      subject: `New Query from ${name}`,
+      from: `"ELESA Contact Form" <${process.env.EMAIL_USER}>`,
+      to: process.env.ADMIN_EMAIL,       // fixed recipient email
+      replyTo: email,                     // sender can reply directly
+      subject: `New query from ${name}`,
       html: `<h3>New Contact Form Submission</h3>
              <p><b>Name:</b> ${name}</p>
              <p><b>Email:</b> ${email}</p>
              <p><b>Message:</b> ${message}</p>`,
     });
 
-    // Acknowledgment Email to User
+    // Optional: Acknowledgment to sender
     await transporter.sendMail({
-      from: `"ELESA Team" <${process.env.MAIL_USER}>`,
+      from: `"ELESA Team" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "We received your query ✔",
       html: `<p>Hello <b>${name}</b>,</p>
@@ -57,7 +50,7 @@ export default async function handler(req, res) {
              <p>Regards,<br/>Team ELESA</p>`,
     });
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, msg: "Email sent successfully!" });
   } catch (err) {
     console.error("Email send error:", err);
     return res.status(500).json({ success: false, error: "Email not sent" });
