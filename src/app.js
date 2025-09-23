@@ -18,7 +18,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:4000",
-  process.env.FRONTEND_URL1.
+  process.env.FRONTEND_URL1,
   process.env.FRONTEND_URL2 // optional: from .env for deployment
 ];
 
