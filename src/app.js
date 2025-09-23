@@ -15,24 +15,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://localhost:4000",
-  process.env.FRONTEND_URL1,
-  process.env.FRONTEND_URL2 // optional: from .env for deployment
+  'https://electrovert-website.vercel.app',
+  'https://elesa-website-lac.vercel.app'
 ];
 
+// CORS middleware
 app.use(cors({
-  origin: function(origin, callback){
-    // allow requests with no origin (like mobile apps or Postman)
-    if(!origin) return callback(null, true);
-    if(allowedOrigins.indexOf(origin) === -1){
-      const msg = `The CORS policy for this site does not allow access from the specified Origin.`;
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
     return callback(null, true);
-  }
+  },
+  methods: ['GET','POST','PUT','DELETE'],
+  credentials: true
 }));
+
+app.use(express.json());
 
 
 app.use("/api/send", contactRouter);
