@@ -56,24 +56,17 @@ if (!fs.existsSync("uploads")) {
 // Check environment: local dev vs. Vercel
 const isVercel = process.env.VERCEL === "1"; 
 
-let storage;
-
-if (isVercel) {
-  // Use memoryStorage on Vercel (no disk writes)
-  storage = multer.memoryStorage();
-} else {
-  // Use diskStorage locally
-  storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      // Only create folder locally
-      if (!fs.existsSync("uploads")) {
-        fs.mkdirSync("uploads");
-      }
-      cb(null, "uploads/");
-    },
-    filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-  });
-}
+const storage = isVercel
+  ? multer.memoryStorage() // no disk writes
+  : multer.diskStorage({
+      destination: (req, file, cb) => {
+        if (!process.env.VERCEL && !fs.existsSync("uploads")) {
+          fs.mkdirSync("uploads");
+        }
+        cb(null, "uploads/");
+      },
+      filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+    });
 
 const upload = multer({
   storage,
