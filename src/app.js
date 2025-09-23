@@ -6,7 +6,7 @@ import { google } from "googleapis";   // <-- missing import
 import { appendToSheet } from "./sheets.js";
 import { sendThankYouEmail } from "./mailer.js";
 import { uploadToDrive } from "./drive.js";
-import contactRouter from '../../backend/src/contact.js'
+import contactRouter from './contact.js'
 
 const app = express();
 
