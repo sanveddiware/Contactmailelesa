@@ -223,7 +223,9 @@ app.use(cors({
   credentials: true
 }));
 
-app.use("/api/send", handler);
+app.post("/api/send", (req, res) => {
+  handler(req, res);
+});
 
 // ---------- Multer Setup ----------
 const isVercel = process.env.VERCEL === "1";

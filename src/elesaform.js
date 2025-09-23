@@ -5,16 +5,22 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
-  const { name, email, message } = req.body;
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  } catch (err) {
+    return res.status(400).json({ success: false, error: "Invalid JSON" });
+  }
+
+  const { name, email, message } = body;
 
   if (!name || !email || !message) {
     return res.status(400).json({ success: false, error: "All fields are required." });
   }
 
   try {
-    // transporter
     const transporter = nodemailer.createTransport({
-      service: "gmail", // Or custom SMTP
+      service: "gmail",
       auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS,
