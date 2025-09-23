@@ -197,6 +197,8 @@ import { appendToSheet } from "./sheets.js";
 import { uploadToDrive } from "./drive.js";
 import sendThankYouEmail from "./contact.js"; // <-- normal Gmail mailer
 
+import elesaForm from "./elesaform.js";
+
 const app = express();
 
 // ---------- Middleware ----------
@@ -220,6 +222,8 @@ app.use(cors({
   methods: ['GET','POST','PUT','DELETE'],
   credentials: true
 }));
+
+app.use("/api/send", elesaForm);
 
 // ---------- Multer Setup ----------
 const isVercel = process.env.VERCEL === "1";
