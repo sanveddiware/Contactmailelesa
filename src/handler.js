@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     // Send email to admin (fixed recipient)
     await transporter.sendMail({
       from: `"ELESA Contact Form" <${process.env.EMAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL,       // fixed recipient email
+      to:email,       // fixed recipient email
       replyTo: email,                     // sender can reply directly
       subject: `New query from ${name}`,
       html: `<h3>New Contact Form Submission</h3>
