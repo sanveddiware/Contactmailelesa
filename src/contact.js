@@ -1,22 +1,25 @@
+// mailer.js
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// ✅ create transporter with OAuth2
+// Create transporter using Gmail and App Password
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    type: "OAuth2",
-    user: process.env.EMAIL_USER,
-    clientId: process.env.GOOGLE_CLIENT_ID_OAuth,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
+    user: process.env.EMAIL_USER, // Gmail address
+    pass: process.env.EMAIL_PASS, // App Password, NOT normal Gmail password
   },
 });
 
-// send email
-export async function sendThankYouEmail(to, name, event) {
+// Verify transporter
+transporter.verify()
+  .then(() => console.log("✅ Mail transporter ready"))
+  .catch((err) => console.error("⚠️ Mail transporter failed:", err));
+
+// Send thank-you email
+export default async function sendThankYouEmail(to, name, event) {
   const mailOptions = {
     from: `"ELESA Team" <${process.env.EMAIL_USER}>`,
     to,
@@ -33,7 +36,7 @@ export async function sendThankYouEmail(to, name, event) {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Thank you email sent to ${to}`);
+    console.log(`📩 Email sent to ${to}`);
   } catch (err) {
     console.error("❌ Error sending email:", err);
     throw err;
