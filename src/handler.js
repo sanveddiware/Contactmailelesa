@@ -1,6 +1,14 @@
 import nodemailer from "nodemailer";
 
 export default async function handler(req, res) {
+  // CORS headers for Vercel if needed
+  if (process.env.VERCEL) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
@@ -23,11 +31,11 @@ export default async function handler(req, res) {
       service: "gmail",
       auth: {
         user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
+        pass: process.env.MAIL_PASS, // Gmail App Password
       },
     });
 
-    // Mail to Admin
+    // Email to Admin
     await transporter.sendMail({
       from: `"ELESA Contact Form" <${process.env.MAIL_USER}>`,
       to: process.env.ADMIN_EMAIL,
@@ -38,7 +46,7 @@ export default async function handler(req, res) {
              <p><b>Message:</b> ${message}</p>`,
     });
 
-    // Acknowledgment Mail to User
+    // Acknowledgment Email to User
     await transporter.sendMail({
       from: `"ELESA Team" <${process.env.MAIL_USER}>`,
       to: email,
