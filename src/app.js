@@ -41,16 +41,45 @@ if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
+// // ---------- Multer Setup ----------
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => cb(null, "uploads/"),
+//   filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+// });
+
+// const upload = multer({
+//   storage,
+//   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+// });
 // ---------- Multer Setup ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
+
+// Check environment: local dev vs. Vercel
+const isVercel = process.env.VERCEL === "1"; 
+
+let storage;
+
+if (isVercel) {
+  // Use memoryStorage on Vercel (no disk writes)
+  storage = multer.memoryStorage();
+} else {
+  // Use diskStorage locally
+  storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      // Only create folder locally
+      if (!fs.existsSync("uploads")) {
+        fs.mkdirSync("uploads");
+      }
+      cb(null, "uploads/");
+    },
+    filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  });
+}
 
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 });
+
 
 // ---------- OAuth2 Setup ----------
 const oauth2Client = new google.auth.OAuth2(
@@ -156,6 +185,70 @@ app.get("/oauth2callback", async (req, res) => {
 //     }
 //   }
 // );
+// app.post(
+//   "/api/register",
+//   upload.fields([
+//     { name: "collegeId", maxCount: 1 },
+//     { name: "paymentscreenshot", maxCount: 1 },
+//   ]),
+//   async (req, res) => {
+//     let collegeIdLink = "";
+//     let paymentScreenshotLink = "";
+//     const uploadedFiles = [];
+
+//     try {
+//       // Upload College ID
+//       if (req.files?.collegeId) {
+//         uploadedFiles.push(req.files.collegeId[0].path);
+//         collegeIdLink = await uploadToDrive(req.files.collegeId[0]);
+//       }
+
+//       // Upload Payment Screenshot
+//       if (req.files?.paymentscreenshot) {
+//         uploadedFiles.push(req.files.paymentscreenshot[0].path);
+//         paymentScreenshotLink = await uploadToDrive(req.files.paymentscreenshot[0]);
+//       }
+
+//       const row = [
+//         req.body.name,
+//         req.body.email,
+//         req.body.phone,
+//         req.body.college,
+//         req.body.event,
+//         req.body.transactionId,
+//         req.body.payment,
+//         collegeIdLink,
+//         paymentScreenshotLink,
+//         new Date().toLocaleString(),
+//       ];
+
+//       await appendToSheet(row);
+//       await sendThankYouEmail(req.body.email, req.body.name, req.body.event);
+
+//       res.json({
+//         success: true,
+//         msg: "✅ Registration successful! Data saved & files uploaded to Drive.",
+//         data: {
+//           ...req.body,
+//           collegeId: collegeIdLink,
+//           paymentscreenshot: paymentScreenshotLink,
+//         },
+//       });
+//     } catch (err) {
+//       console.error("Error in /api/register:", err);
+//       res.status(500).json({ success: false, msg: "❌ Server error", error: err.message });
+//     } finally {
+//       // Always delete uploaded files, success or error
+//       for (const path of uploadedFiles) {
+//         fs.unlink(path, (err) => {
+//           if (err) console.error("Failed to delete uploaded file:", path, err);
+//         });
+//       }
+//     }
+//   }
+// );
+
+
 app.post(
   "/api/register",
   upload.fields([
@@ -163,22 +256,16 @@ app.post(
     { name: "paymentscreenshot", maxCount: 1 },
   ]),
   async (req, res) => {
-    let collegeIdLink = "";
-    let paymentScreenshotLink = "";
-    const uploadedFiles = [];
-
     try {
       // Upload College ID
-      if (req.files?.collegeId) {
-        uploadedFiles.push(req.files.collegeId[0].path);
-        collegeIdLink = await uploadToDrive(req.files.collegeId[0]);
-      }
+      const collegeIdLink = req.files?.collegeId
+        ? await uploadToDrive(req.files.collegeId[0])
+        : "";
 
       // Upload Payment Screenshot
-      if (req.files?.paymentscreenshot) {
-        uploadedFiles.push(req.files.paymentscreenshot[0].path);
-        paymentScreenshotLink = await uploadToDrive(req.files.paymentscreenshot[0]);
-      }
+      const paymentScreenshotLink = req.files?.paymentscreenshot
+        ? await uploadToDrive(req.files.paymentscreenshot[0])
+        : "";
 
       const row = [
         req.body.name,
@@ -208,13 +295,6 @@ app.post(
     } catch (err) {
       console.error("Error in /api/register:", err);
       res.status(500).json({ success: false, msg: "❌ Server error", error: err.message });
-    } finally {
-      // Always delete uploaded files, success or error
-      for (const path of uploadedFiles) {
-        fs.unlink(path, (err) => {
-          if (err) console.error("Failed to delete uploaded file:", path, err);
-        });
-      }
     }
   }
 );
