@@ -54,25 +54,30 @@ if (!fs.existsSync("uploads")) {
 // ---------- Multer Setup ----------
 
 // Check environment: local dev vs. Vercel
-const isVercel = process.env.VERCEL === "1"; 
 
+const isVercel = process.env.VERCEL === "1";
+
+// Multer storage setup
 const storage = isVercel
-  ? multer.memoryStorage() // no disk writes
+  ? multer.memoryStorage() // no disk writes on Vercel
   : multer.diskStorage({
       destination: (req, file, cb) => {
-        if (!process.env.VERCEL && !fs.existsSync("uploads")) {
-          fs.mkdirSync("uploads");
+        // Only create folder locally
+        const uploadDir = "uploads";
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
         }
-        cb(null, "uploads/");
+        cb(null, uploadDir);
       },
-      filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+      filename: (req, file, cb) => {
+        cb(null, Date.now() + "-" + file.originalname);
+      },
     });
 
-const upload = multer({
+export const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 });
-
 
 // ---------- OAuth2 Setup ----------
 const oauth2Client = new google.auth.OAuth2(
