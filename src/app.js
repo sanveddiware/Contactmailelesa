@@ -172,7 +172,10 @@ app.post(
 
 
 //Testing
-
+app.get('/', (req, res) => {
+  console.log("GET request received at '/'");
+  res.send('Server is running properly!');
+});
 
 
 //Electrovert Website
