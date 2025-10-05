@@ -207,7 +207,8 @@ app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigins = [
   'https://electrovert-website.vercel.app',
-  'https://elesa-website-lac.vercel.app'
+  'https://elesa-website-lac.vercel.app',
+  'https://www.wceelesa.org.in'
 ];
 
 // CORS middleware
